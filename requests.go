@@ -29,6 +29,7 @@ func NewRequest() *request {
 	// flags
 	command.flagset.StringVar(&request.location, "loc", DummyEndpointTest, "Define request's URL")
 	command.flagset.StringVar(&request.method, "method", "GET", "Define request's HTTP Method")
+	command.flagset.StringVar(&request.body, "data", "", "Define the raw data for the request's body")
 
 	return request
 }
@@ -42,7 +43,7 @@ func (r *request) Init(args []string) {
 }
 
 func (r *request) parseBody() *bytes.Reader {
-
+	// A mess
 	if (r.method == "POST" || r.method == "PUT" || r.method == "PATCH") && r.body == "" {
 
 		if filename := r.flagset.Arg(0); filename != "" {
@@ -82,6 +83,26 @@ func buildHeaders(request *http.Request, headers Headers) {
 	}
 }
 
+func (r *request) render(response string) {
+
+	format := `
+  %s %s %s
+  %s
+
+  %s
+  `
+	method := r.method
+	url := r.location
+	scheme := "HTTP/1.1"
+	var headers string
+
+	for header, value := range r.headers {
+		headers += header + ": " + value + "\n"
+	}
+	text := fmt.Sprintf(format, method, url, scheme, headers, response)
+	fmt.Println(text)
+}
+
 func makeRequest(r *request) error {
 
 	httpMethod, err := getMethod(r.method)
@@ -115,7 +136,7 @@ func makeRequest(r *request) error {
 		return err
 	}
 
-	fmt.Println(string(responseBody))
+	r.render(string(responseBody))
 
 	return nil
 }
