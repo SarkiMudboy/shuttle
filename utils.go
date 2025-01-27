@@ -12,11 +12,11 @@ func getMethod(method string) (string, error) {
 	case "GET":
 		return http.MethodGet, nil
 	case "POST":
-		return http.MethodPut, nil
+		return http.MethodPost, nil
 	case "PUT":
 		return http.MethodPut, nil
 	case "DELETE":
-		return http.MethodPut, nil
+		return http.MethodDelete, nil
 	default:
 		return "", errors.New("Invalid Operation")
 	}
@@ -24,5 +24,9 @@ func getMethod(method string) (string, error) {
 
 func parseHeaders(rawHeaderString string) Headers {
 	h := make(map[string]string)
+
+	if rawHeaderString == "" { // default headers
+		h["Content-Type"] = "application/json"
+	}
 	return h
 }

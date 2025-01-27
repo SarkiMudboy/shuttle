@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 )
 
 type Headers map[string]string
@@ -24,7 +25,10 @@ func NewRequest() *request {
 		flagset: flag.NewFlagSet("call", flag.ContinueOnError),
 	}
 	request := &request{Command: command}
-	command.flagset.StringVar(&request.location, "loc", DummyEndpointTest, "Request's URL")
+
+	// flags
+	command.flagset.StringVar(&request.location, "loc", DummyEndpointTest, "Define request's URL")
+	command.flagset.StringVar(&request.method, "method", "GET", "Define request's HTTP Method")
 
 	return request
 }
@@ -38,16 +42,44 @@ func (r *request) Init(args []string) {
 }
 
 func (r *request) parseBody() *bytes.Reader {
-	// where our json encode will be
-	return bytes.NewReader([]byte(r.body))
+
+	if (r.method == "POST" || r.method == "PUT" || r.method == "PATCH") && r.body == "" {
+
+		if filename := r.flagset.Arg(0); filename != "" {
+			file, err := os.Open(filename)
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+			defer file.Close()
+
+			body, err := io.ReadAll(file)
+
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+
+			return bytes.NewReader(body)
+		}
+	} else if r.body != "" {
+		return bytes.NewReader([]byte(r.body))
+	} else {
+		fmt.Printf("No body provided for a %s request", r.method)
+	}
+
+	return nil
 }
 
 func (r *request) Run() error {
 	return makeRequest(r)
 }
 
-func buildHeaders(client http.Client, headers Headers) http.Client {
-	return client
+func buildHeaders(request *http.Request, headers Headers) {
+
+	for header, value := range headers {
+		request.Header.Add(header, value)
+	}
 }
 
 func makeRequest(r *request) error {
@@ -58,7 +90,7 @@ func makeRequest(r *request) error {
 		return fmt.Errorf("An error occured: %s", err)
 	}
 
-	if r.location != "" {
+	if r.location == "" {
 		return fmt.Errorf("Enter a valid URL")
 	}
 
@@ -69,6 +101,7 @@ func makeRequest(r *request) error {
 	}
 
 	client := http.Client{}
+	buildHeaders(request, parseHeaders(""))
 
 	response, err := client.Do(request)
 	if err != nil {
