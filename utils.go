@@ -22,11 +22,12 @@ func getMethod(method string) (string, error) {
 	}
 }
 
-func parseHeaders(rawHeaderString string) Headers {
-	h := make(map[string]string)
+var defaultHeaders = map[string][]string{
+	"Content-Type": {ContentTypeJSON},
+}
 
-	if rawHeaderString == "" { // default headers
-		h["Content-Type"] = "application/json"
+func addHeadersToRequest(request *http.Request, headers Headers) {
+	for header, value := range headers.parsedHeaders {
+		request.Header.Set(header, strings.Join(value, ","))
 	}
-	return h
 }

@@ -2,21 +2,36 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"strings"
 )
 
-type Headers map[string]string
+type Headers struct {
+	parsedHeaders map[string][]string
+	rawHeaders    string
+}
 
 type request struct {
 	*Command
+	response *response
 	location string
 	headers  Headers
 	method   string
 	body     string
+}
+
+func (h *Headers) String() (headers string) {
+
+	for header, value := range h.parsedHeaders {
+		headerValue := strings.Join(value, ",")
+		headers += (header + ": " + headerValue + "\n")
+	}
+	return
 }
 
 func NewRequest() *request {
@@ -30,6 +45,7 @@ func NewRequest() *request {
 	command.flagset.StringVar(&request.location, "loc", DummyEndpointTest, "Define request's URL")
 	command.flagset.StringVar(&request.method, "method", "GET", "Define request's HTTP Method")
 	command.flagset.StringVar(&request.body, "data", "", "Define the raw data for the request's body")
+	command.flagset.StringVar(&request.headers.rawHeaders, "headers", "", "Add headers for the request")
 
 	return request
 }
@@ -42,8 +58,27 @@ func (r *request) Init(args []string) {
 	r.flagset.Parse(args)
 }
 
-func (r *request) parseBody() *bytes.Reader {
+func (r *request) parseHeaders() (err error) {
+
+	if r.headers.rawHeaders != "" {
+
+		headers := r.headers.parsedHeaders
+		err = json.Unmarshal([]byte(r.headers.rawHeaders), &headers)
+
+		if err == nil {
+			r.headers.parsedHeaders = headers
+		}
+
+	} else {
+		r.headers.parsedHeaders = defaultHeaders
+	}
+	return
+}
+
+func (r *request) parseBody() io.Reader {
 	// A mess
+	// update: not a mess
+
 	if (r.method == "POST" || r.method == "PUT" || r.method == "PATCH") && r.body == "" {
 
 		if filename := r.flagset.Arg(0); filename != "" {
@@ -76,31 +111,22 @@ func (r *request) Run() error {
 	return makeRequest(r)
 }
 
-func buildHeaders(request *http.Request, headers Headers) {
-
-	for header, value := range headers {
-		request.Header.Add(header, value)
-	}
-}
-
-func (r *request) render(response string) {
+func (r *request) String() string {
 
 	format := `
-  %s %s %s
-  %s
-
-  %s
+%s %s %s
+%s
+%s
   `
+	var body Body
+
 	method := r.method
 	url := r.location
 	scheme := "HTTP/1.1"
-	var headers string
+	body = []byte(r.body)
 
-	for header, value := range r.headers {
-		headers += header + ": " + value + "\n"
-	}
-	text := fmt.Sprintf(format, method, url, scheme, headers, response)
-	fmt.Println(text)
+	text := fmt.Sprintf(format, method, url, scheme, r.headers.String(), body.String(r.headers.getContentType()))
+	return text
 }
 
 func makeRequest(r *request) error {
@@ -116,13 +142,18 @@ func makeRequest(r *request) error {
 	}
 
 	request, err := http.NewRequest(httpMethod, r.location, r.parseBody()) // encode the body if
-
 	if err != nil {
 		return fmt.Errorf("An error occured: %s", err)
 	}
 
+	err = r.parseHeaders()
+	if err != nil {
+		return fmt.Errorf("An error occured: %s", err)
+	}
+
+	addHeadersToRequest(request, r.headers)
+
 	client := http.Client{}
-	buildHeaders(request, parseHeaders(""))
 
 	response, err := client.Do(request)
 	if err != nil {
@@ -131,12 +162,11 @@ func makeRequest(r *request) error {
 
 	defer response.Body.Close()
 
-	responseBody, err := io.ReadAll(response.Body)
+	res, err := NewResponse(response)
 	if err != nil {
 		return err
 	}
 
-	r.render(string(responseBody))
-
+	fmt.Println(res.String())
 	return nil
 }
