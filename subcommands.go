@@ -4,10 +4,14 @@ import (
 	"flag"
 )
 
+type Color string
+
 const (
-	ColorRed   = "\u001b[31m"
-	ColorGreen = "\u001b[32m"
-	ColorReset = "\u001b[0m"
+	ColorRed    Color = "\u001b[31m"
+	ColorGreen  Color = "\u001b[32m"
+	ColorBlue   Color = "\u001b[34m"
+	ColorYellow Color = "\u001b[33m"
+	ColorReset  Color = "\u001b[0m"
 )
 
 type Command struct {

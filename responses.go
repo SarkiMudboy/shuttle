@@ -9,18 +9,24 @@ import (
 
 type Body []byte
 
+type ResponseStatus struct {
+	code   int
+	status string
+}
+
 type response struct {
-	headers    Headers
-	body       Body
-	statusCode int
-	status     string
+	headers  Headers
+	body     Body
+	status   ResponseStatus
+	protocol string
 }
 
 func NewResponse(httpResponse *http.Response) (response response, err error) {
 	// fmt.Println(httpResponse.Header)
 
-	response.statusCode, response.status = httpResponse.StatusCode, httpResponse.Status
+	response.status.code, response.status.status = httpResponse.StatusCode, httpResponse.Status
 	response.body, err = io.ReadAll(httpResponse.Body)
+	response.protocol = httpResponse.Proto
 
 	if err != nil {
 		return response, err
@@ -55,31 +61,31 @@ func (body Body) String(contentType string) string {
 			return ""
 		}
 
-		return string(prettyJSON)
+		return shade(ColorYellow, string(prettyJSON))
 	}
 
-	return string(body)
+	return shade(ColorYellow, string(body))
 }
 
-func renderResponseStatus(code int, text string) string {
+func (s *ResponseStatus) String() string {
 
-	shade := ColorGreen
+	color := ColorGreen
 
-	if code > 399 {
-		shade = ColorRed
+	if s.code > 399 {
+		color = ColorRed
 	}
-	return fmt.Sprint(shade, text, ColorReset)
+
+	return shade(color, s.status)
 }
 
 func (r *response) String() string {
 
-	status := renderResponseStatus(r.statusCode, r.status)
 	format := `
-%s
+%s %s
 %s
 
 %s
-  `
-	text := fmt.Sprintf(format, status, r.headers.String(), r.body.String(r.headers.getContentType()))
+ `
+	text := fmt.Sprintf(format, r.status.String(), shade(ColorBlue, r.protocol), r.headers.String(), r.body.String(r.headers.getContentType()))
 	return text
 }
