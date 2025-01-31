@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// test for cmd utils by inspecting errors (create error constants)
 func root(args []string) error {
 
 	if len(args) < 1 {

@@ -47,6 +47,8 @@ func NewRequest() *request {
 	command.flagset.StringVar(&request.body, "data", "", "Define the raw data for the request's body")
 	command.flagset.StringVar(&request.headers.rawHeaders, "headers", "", "Add headers for the request")
 
+	request.headers.parsedHeaders = make(map[string][]string)
+
 	return request
 }
 
@@ -58,57 +60,93 @@ func (r *request) Init(args []string) {
 	r.flagset.Parse(args)
 }
 
-func (r *request) parseHeaders() (err error) {
+func (h *Headers) parse() (err error) {
+	if h.rawHeaders != "" {
 
-	if r.headers.rawHeaders != "" {
+		headers := h.parsedHeaders
 
-		headers := r.headers.parsedHeaders
-		err = json.Unmarshal([]byte(r.headers.rawHeaders), &headers)
+		headerData := make(map[string]interface{})
+		err = json.Unmarshal([]byte(h.rawHeaders), &headerData)
+
+		for key, value := range headerData {
+
+			switch v := value.(type) {
+
+			case []interface{}:
+
+				var values []string
+				for _, val := range v {
+					if headerValue, ok := val.(string); ok {
+						values = append(values, headerValue)
+					} else {
+						return ErrInvalidResourceInput
+					}
+				}
+
+				headers[key] = values
+
+			case string:
+				headers[key] = []string{v}
+
+			case nil:
+			default:
+				return ErrInvalidResourceInput
+			}
+
+		}
 
 		if err == nil {
-			r.headers.parsedHeaders = headers
+			h.parsedHeaders = headers
 		}
 
 	} else {
-		r.headers.parsedHeaders = defaultHeaders
+		h.parsedHeaders = defaultHeaders
 	}
 	return
 }
 
-func (r *request) parseBody() io.Reader {
-	// A mess
-	// update: not a mess
+// test
+func (r *request) parseHeaders() (err error) {
+	headers := r.headers
+	err = headers.parse()
+
+	if err == nil {
+		r.headers = headers
+	}
+	return
+}
+
+// test
+func (r *request) parseBody() (io.Reader, error) {
 
 	if (r.method == "POST" || r.method == "PUT" || r.method == "PATCH") && r.body == "" {
 
 		if filename := r.flagset.Arg(0); filename != "" {
 			file, err := os.Open(filename)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return nil, err
 			}
 			defer file.Close()
 
 			body, err := io.ReadAll(file)
 
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				return nil, err
 			}
 
-			return bytes.NewReader(body)
+			return bytes.NewReader(body), nil
 		}
 	} else if r.body != "" {
-		return bytes.NewReader([]byte(r.body))
+		return bytes.NewReader([]byte(r.body)), nil
 	} else {
 		fmt.Printf("No body provided for a %s request", r.method)
 	}
 
-	return nil
+	return nil, nil
 }
 
 func (r *request) Run() error {
-	return makeRequest(r)
+	return r.makeRequest()
 }
 
 func (r *request) String() string {
@@ -129,8 +167,10 @@ func (r *request) String() string {
 	return text
 }
 
-func makeRequest(r *request) error {
+// test e2e
+func (r *request) makeRequest() error {
 
+	var body io.Reader
 	httpMethod, err := getMethod(r.method)
 
 	if err != nil {
@@ -141,7 +181,12 @@ func makeRequest(r *request) error {
 		return fmt.Errorf("Enter a valid URL")
 	}
 
-	request, err := http.NewRequest(httpMethod, r.location, r.parseBody()) // encode the body if
+	body, err = r.parseBody()
+	if err != nil {
+		return err
+	}
+
+	request, err := http.NewRequest(httpMethod, r.location, body) // encode the body if
 	if err != nil {
 		return fmt.Errorf("An error occured: %s", err)
 	}
@@ -166,6 +211,8 @@ func makeRequest(r *request) error {
 	if err != nil {
 		return err
 	}
+
+	r.response = &res
 
 	fmt.Println(res.String())
 	return nil

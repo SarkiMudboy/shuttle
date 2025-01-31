@@ -1,5 +1,9 @@
 package main
 
+import (
+	"errors"
+)
+
 const DummyEndpointTest = "https://dummyjson.com/test"
 
 const (
@@ -7,3 +11,6 @@ const (
 	ContentTypeHTML  = "text/html"
 	ContentTypePlain = "text/plain"
 )
+
+// errors
+var ErrInvalidResourceInput = errors.New("Invalid input")

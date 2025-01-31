@@ -22,7 +22,6 @@ type response struct {
 }
 
 func NewResponse(httpResponse *http.Response) (response response, err error) {
-	// fmt.Println(httpResponse.Header)
 
 	response.status.code, response.status.status = httpResponse.StatusCode, httpResponse.Status
 	response.body, err = io.ReadAll(httpResponse.Body)
@@ -45,6 +44,7 @@ func (header *Headers) getContentType() string {
 	return header.parsedHeaders["Content-Type"][0]
 }
 
+// test
 func (body Body) String(contentType string) string {
 
 	if contentType == ContentTypeJSON {
