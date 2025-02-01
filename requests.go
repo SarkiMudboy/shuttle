@@ -137,7 +137,9 @@ func (r *request) parseBody() (io.Reader, error) {
 			return bytes.NewReader(body), nil
 		}
 	} else if r.body != "" {
+
 		return bytes.NewReader([]byte(r.body)), nil
+
 	} else {
 		fmt.Printf("No body provided for a %s request", r.method)
 	}

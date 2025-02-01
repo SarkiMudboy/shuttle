@@ -6,6 +6,8 @@ import (
 
 const DummyEndpointTest = "https://dummyjson.com/test"
 
+// type contentType string
+
 const (
 	ContentTypeJSON  = "application/json"
 	ContentTypeHTML  = "text/html"

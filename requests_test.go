@@ -109,11 +109,12 @@ func TestParseHeaders(t *testing.T) {
 func TestParseRequestBody(t *testing.T) {
 
 	testCases := []struct {
-		name       string
-		isFile     bool
-		request    request
-		resultBody []byte
-		expErr     error
+		name        string
+		isFile      bool
+		request     request
+		contentType string
+		resultBody  []byte
+		expErr      error
 	}{
 		{
 			name:   "TestGetRequestWithBody",
@@ -122,8 +123,9 @@ func TestParseRequestBody(t *testing.T) {
 				method: "GET",
 				body:   `{"houseNo":"1234","street:"New Haven"}`,
 			},
-			resultBody: nil,
-			expErr:     nil,
+			contentType: ContentTypeJSON,
+			resultBody:  nil,
+			expErr:      nil,
 		},
 		{
 			name:   "TestPostRequestWithBody",
@@ -132,8 +134,9 @@ func TestParseRequestBody(t *testing.T) {
 				method: "POST",
 				body:   `{"Product_ID":333,"Product_Name":"bed"}`,
 			},
-			resultBody: []byte(`{"Product_ID":333,"Product_Name":"bed"}`),
-			expErr:     nil,
+			contentType: ContentTypeJSON,
+			resultBody:  []byte(`{"Product_ID":333,"Product_Name":"bed"}`),
+			expErr:      nil,
 		},
 	}
 
@@ -160,11 +163,21 @@ func TestParseRequestBody(t *testing.T) {
 				}
 
 				result := new([]byte)
-				res.Read(*result)
 
-				// json marshal first
-				if !bytes.Equal(tc.resultBody, *result) {
-					t.Errorf("Expected %s but got %s", string(tc.resultBody), string(*result))
+				if reader, ok := res.(*bytes.Reader); ok {
+					reader.Seek(0, 0)
+					_, err = reader.Read(*result)
+
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if !bytes.Equal(tc.resultBody, *result) {
+						t.Errorf("Expected %s but got %s", string(tc.resultBody), string(*result))
+					}
+
+				} else {
+					t.Fail()
 				}
 			}
 		})
