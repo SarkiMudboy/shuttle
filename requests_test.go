@@ -155,7 +155,6 @@ func TestParseRequestBody(t *testing.T) {
 			name: "TestParseRequestBodyFromFile",
 			request: request{
 				method:     "POST",
-				body:       `{"Product_ID":333,"Product_Name":"bed"}`,
 				sourceFile: "testdata/test_body.json",
 				Command: &Command{
 					flagset: flag.NewFlagSet("", flag.ContinueOnError),
