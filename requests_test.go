@@ -1,7 +1,6 @@
 package main
 
 import (
-	//	"errors"
 	"bytes"
 	"errors"
 	"flag"
@@ -111,40 +110,53 @@ func TestParseRequestBody(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		fileName    string
 		request     request
 		contentType string
 		resultBody  []byte
 		expErr      error
 	}{
 		{
-			name:     "TestGetRequestWithBody",
-			fileName: "",
+			name: "TestGetRequestWithBody",
 			request: request{
-				method: "GET",
-				body:   `{"houseNo":"1234","street:"New Haven"}`,
+				method:     "GET",
+				body:       `{"houseNo":"1234","street:"New Haven"}`,
+				sourceFile: "",
 			},
 			contentType: ContentTypeJSON,
 			resultBody:  nil,
 			expErr:      ErrBodyNotAllowedForSafeMethods,
 		},
 		{
-			name:     "TestGetRequestWithoutBody",
-			fileName: "",
+			name: "TestGetRequestWithoutBody",
 			request: request{
-				method: "GET",
-				body:   "",
+				method:     "GET",
+				body:       "",
+				sourceFile: "",
 			},
 			contentType: ContentTypeJSON,
 			resultBody:  nil,
 			expErr:      nil,
 		},
 		{
-			name:     "TestPostRequestWithBody",
-			fileName: "",
+			name: "TestPostRequestWithBody",
 			request: request{
-				method: "POST",
-				body:   `{"Product_ID":333,"Product_Name":"bed"}`,
+				method:     "POST",
+				body:       `{"Product_ID":333,"Product_Name":"bed"}`,
+				sourceFile: "",
+				Command: &Command{
+					flagset: flag.NewFlagSet("", flag.ContinueOnError),
+				},
+			},
+			contentType: ContentTypeJSON,
+			resultBody:  []byte(`{"Product_ID":333,"Product_Name":"bed"}`),
+			expErr:      nil,
+		},
+		{
+			name: "TestParseRequestBodyFromFile",
+			request: request{
+				method:     "POST",
+				body:       `{"Product_ID":333,"Product_Name":"bed"}`,
+				sourceFile: "testdata/test_body.json",
 				Command: &Command{
 					flagset: flag.NewFlagSet("", flag.ContinueOnError),
 				},
@@ -158,10 +170,7 @@ func TestParseRequestBody(t *testing.T) {
 	for _, tc := range testCases {
 
 		t.Run(tc.name, func(t *testing.T) {
-			if tc.fileName == "" {
-				args := tc.request.flagset.Args()
-				args = append(args, tc.fileName)
-			}
+
 			res, err := tc.request.parseBody()
 
 			if tc.expErr != nil {
@@ -190,7 +199,7 @@ func TestParseRequestBody(t *testing.T) {
 					t.Fatal(err)
 				}
 
-				if !bytes.Equal(tc.resultBody, result) {
+				if !bytes.Equal(tc.resultBody, bytes.TrimSpace(result)) {
 					t.Errorf("Expected %s but got %s", string(tc.resultBody), string(result))
 				}
 

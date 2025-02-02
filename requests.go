@@ -20,11 +20,12 @@ type Headers struct {
 
 type request struct {
 	*Command
-	response *response
-	location string
-	headers  Headers
-	method   string
-	body     string
+	response   *response
+	location   string
+	headers    Headers
+	method     string
+	body       string
+	sourceFile string
 }
 
 var SafeMethods = []string{"GET", "HEAD"}
@@ -61,7 +62,12 @@ func (r *request) Name() string {
 }
 
 func (r *request) Init(args []string) {
+
 	r.flagset.Parse(args)
+
+	if filename := r.flagset.Arg(0); filename != "" {
+		r.sourceFile = filename
+	}
 }
 
 func (h *Headers) parse() (err error) {
@@ -128,8 +134,8 @@ func (r *request) parseBody() (io.Reader, error) {
 
 	if !slices.Contains(SafeMethods, r.method) {
 
-		if filename := r.flagset.Arg(0); filename != "" {
-			file, err := os.Open(filename)
+		if r.sourceFile != "" {
+			file, err := os.Open(r.sourceFile)
 			if err != nil {
 				return nil, err
 			}
