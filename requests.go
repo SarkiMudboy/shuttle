@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -24,6 +26,8 @@ type request struct {
 	method   string
 	body     string
 }
+
+var SafeMethods = []string{"GET", "HEAD"}
 
 func (h *Headers) String() (headers string) {
 
@@ -119,7 +123,10 @@ func (r *request) parseHeaders() (err error) {
 // test
 func (r *request) parseBody() (io.Reader, error) {
 
-	if (r.method == "POST" || r.method == "PUT" || r.method == "PATCH") && r.body == "" {
+	//if method is not safe [] if body is not provided print warning
+	// else -> if body is provided raise error else pass
+
+	if !slices.Contains(SafeMethods, r.method) {
 
 		if filename := r.flagset.Arg(0); filename != "" {
 			file, err := os.Open(filename)
@@ -136,12 +143,17 @@ func (r *request) parseBody() (io.Reader, error) {
 
 			return bytes.NewReader(body), nil
 		}
-	} else if r.body != "" {
 
-		return bytes.NewReader([]byte(r.body)), nil
+		if r.body == "" {
+			log.Printf("No body provided for a %s request", r.method)
+		} else {
+			return bytes.NewReader([]byte(r.body)), nil
+		}
 
 	} else {
-		fmt.Printf("No body provided for a %s request", r.method)
+		if r.body != "" {
+			return nil, ErrBodyNotAllowedForSafeMethods
+		}
 	}
 
 	return nil, nil

@@ -15,4 +15,7 @@ const (
 )
 
 // errors
-var ErrInvalidResourceInput = errors.New("Invalid input")
+var (
+	ErrInvalidResourceInput         = errors.New("Invalid input")
+	ErrBodyNotAllowedForSafeMethods = errors.New("Operation Not Allowed for GET/HEAD requests")
+)

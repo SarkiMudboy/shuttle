@@ -4,6 +4,7 @@ import (
 	//	"errors"
 	"bytes"
 	"errors"
+	"flag"
 	"reflect"
 	"testing"
 )
@@ -110,29 +111,43 @@ func TestParseRequestBody(t *testing.T) {
 
 	testCases := []struct {
 		name        string
-		isFile      bool
+		fileName    string
 		request     request
 		contentType string
 		resultBody  []byte
 		expErr      error
 	}{
 		{
-			name:   "TestGetRequestWithBody",
-			isFile: false,
+			name:     "TestGetRequestWithBody",
+			fileName: "",
 			request: request{
 				method: "GET",
 				body:   `{"houseNo":"1234","street:"New Haven"}`,
 			},
 			contentType: ContentTypeJSON,
 			resultBody:  nil,
+			expErr:      ErrBodyNotAllowedForSafeMethods,
+		},
+		{
+			name:     "TestGetRequestWithoutBody",
+			fileName: "",
+			request: request{
+				method: "GET",
+				body:   "",
+			},
+			contentType: ContentTypeJSON,
+			resultBody:  nil,
 			expErr:      nil,
 		},
 		{
-			name:   "TestPostRequestWithBody",
-			isFile: false,
+			name:     "TestPostRequestWithBody",
+			fileName: "",
 			request: request{
 				method: "POST",
 				body:   `{"Product_ID":333,"Product_Name":"bed"}`,
+				Command: &Command{
+					flagset: flag.NewFlagSet("", flag.ContinueOnError),
+				},
 			},
 			contentType: ContentTypeJSON,
 			resultBody:  []byte(`{"Product_ID":333,"Product_Name":"bed"}`),
@@ -143,42 +158,44 @@ func TestParseRequestBody(t *testing.T) {
 	for _, tc := range testCases {
 
 		t.Run(tc.name, func(t *testing.T) {
-			if !tc.isFile {
-				res, err := tc.request.parseBody()
+			if tc.fileName == "" {
+				args := tc.request.flagset.Args()
+				args = append(args, tc.fileName)
+			}
+			res, err := tc.request.parseBody()
 
-				if tc.expErr != nil {
-					if err == nil {
-						t.Error("Expected error got nil instead")
-					}
-
-					if !errors.Is(tc.expErr, err) {
-						t.Errorf("Expected error: %s, but got error: %s", tc.expErr, err)
-					}
-
-					return
+			if tc.expErr != nil {
+				if err == nil {
+					t.Error("Expected error got nil instead")
 				}
+
+				if !errors.Is(tc.expErr, err) {
+					t.Errorf("Expected error: %s, but got error: %s", tc.expErr, err)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %s", err)
+			}
+
+			if reader, ok := res.(*bytes.Reader); ok {
+				result := make([]byte, reader.Len())
+
+				reader.Seek(0, 0)
+				_, err = reader.Read(result)
 
 				if err != nil {
-					t.Errorf("Unexpected error: %s", err)
+					t.Fatal(err)
 				}
 
-				result := new([]byte)
-
-				if reader, ok := res.(*bytes.Reader); ok {
-					reader.Seek(0, 0)
-					_, err = reader.Read(*result)
-
-					if err != nil {
-						t.Fatal(err)
-					}
-
-					if !bytes.Equal(tc.resultBody, *result) {
-						t.Errorf("Expected %s but got %s", string(tc.resultBody), string(*result))
-					}
-
-				} else {
-					t.Fail()
+				if !bytes.Equal(tc.resultBody, result) {
+					t.Errorf("Expected %s but got %s", string(tc.resultBody), string(result))
 				}
+
+			} else if tc.resultBody != nil {
+				t.Fail()
 			}
 		})
 	}
