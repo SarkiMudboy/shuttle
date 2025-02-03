@@ -2,9 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"flag"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -205,6 +210,110 @@ func TestParseRequestBody(t *testing.T) {
 			} else if tc.resultBody != nil {
 				t.Fail()
 			}
+		})
+	}
+}
+
+func mockServer(body string, status int, headers map[string][]string) (*httptest.Server, error) {
+
+	f := func(w http.ResponseWriter, r *http.Request) {
+
+		for header, value := range headers {
+			values := strings.Join(value, ";")
+			w.Header().Set(header, values)
+		}
+
+		w.WriteHeader(status)
+
+		if body != "" {
+			json.NewEncoder(w).Encode(body)
+		}
+
+	}
+
+	return httptest.NewServer(http.HandlerFunc(f)), nil
+}
+
+func TestMakeRequest(t *testing.T) {
+
+	data := `{
+    "id": 1,
+    "username": "jayhound101",
+    "email": "jyh@gmail.com",
+    "cart": {
+      "no_of_items": 22,
+      "cost": 233.45,
+      "cleared": false
+    }
+  }`
+
+	testCases := []struct {
+		name       string
+		statusCode int
+		headers    map[string][]string
+		body       string
+		method     string
+		expErr     error
+	}{
+		{
+			name:       "TestRequestsCanBeMadeSucessfully",
+			statusCode: 200,
+			headers: map[string][]string{
+				"Content-Type":           {"application/json"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			body:   data,
+			method: "GET",
+			expErr: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			server, err := mockServer(tc.body, tc.statusCode, tc.headers)
+
+			if err != nil {
+				t.Fatalf("error creating server: %s", err)
+			}
+
+			request := NewRequest()
+			request.flagset.Set("loc", server.URL)
+			request.flagset.Set("method", tc.method)
+
+			request.Init([]string{})
+			fmt.Println(request.location)
+
+			err = request.makeRequest()
+
+			if tc.expErr != nil {
+				if err == nil {
+					t.Error("Expected error got nil instead")
+				}
+
+				if !errors.Is(tc.expErr, err) {
+					t.Errorf("Expected error: %s, but got error: %s", tc.expErr, err)
+				}
+
+				return
+			}
+
+			if err != nil {
+				t.Errorf("Unexpected error: %s", err)
+			}
+
+			if !reflect.DeepEqual(request.response.headers.parsedHeaders, tc.headers) {
+				t.Errorf("Headers do not match")
+			}
+
+			if request.response.status.code != tc.statusCode {
+				t.Fatalf("Expected statusCode : %d, but got %d", request.response.status.code, tc.statusCode)
+			}
+
+			if !bytes.Equal([]byte(tc.body), request.response.body) {
+				t.Errorf("Expected %s but got %s", string(tc.body), string(request.response.body))
+			}
+
 		})
 	}
 }
