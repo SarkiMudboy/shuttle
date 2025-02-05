@@ -166,7 +166,7 @@ func (r *request) parseBody() (io.Reader, error) {
 }
 
 func (r *request) Run() error {
-	return r.makeRequest()
+	return r.makeRequest(false)
 }
 
 func (r *request) String() string {
@@ -188,7 +188,7 @@ func (r *request) String() string {
 }
 
 // test e2e
-func (r *request) makeRequest() error {
+func (r *request) makeRequest(supress bool) error {
 
 	var body io.Reader
 	httpMethod, err := getMethod(r.method)
@@ -234,6 +234,8 @@ func (r *request) makeRequest() error {
 
 	r.response = &res
 
-	fmt.Println(res.String())
+	if !supress {
+		fmt.Println(res.String())
+	}
 	return nil
 }
