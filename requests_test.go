@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"flag"
-	"fmt"
 	"reflect"
 	"slices"
 	"testing"
@@ -246,15 +245,23 @@ func TestMakeRequest(t *testing.T) {
 			requestParams: rd("GET"),
 			expErr:        nil,
 		},
+		{
+			name:       "TestRequestsCanBeMadeSucessfully",
+			statusCode: 200,
+			headers: map[string][]string{
+				"Content-Type":           {"application/json"},
+				"X-Content-Type-Options": {"nosniff"},
+			},
+			requestParams: rd("POST"),
+			expErr:        nil,
+		},
 	}
 
 	for _, tc := range testCases {
+
 		t.Run(tc.name, func(t *testing.T) {
 
-			if slices.Contains(SafeMethods, tc.requestParams.method) {
-
-			}
-			server, err := mockServer(tc.requestParams, tc.statusCode, tc.headers)
+			server, err := mockServer(tc.requestParams, tc.headers)
 
 			if err != nil {
 				t.Fatalf("error creating server: %s", err)
@@ -262,10 +269,13 @@ func TestMakeRequest(t *testing.T) {
 
 			request := NewRequest()
 			request.flagset.Set("loc", server.URL)
-			request.flagset.Set("method", tc.method)
+			request.flagset.Set("method", tc.requestParams.method)
 
+			if !slices.Contains(SafeMethods, tc.requestParams.method) {
+				request.body = tc.requestParams.body
+				request.headers.parsedHeaders = tc.headers
+			}
 			request.Init([]string{})
-			fmt.Println(request.location)
 
 			err = request.makeRequest(true)
 
@@ -285,18 +295,27 @@ func TestMakeRequest(t *testing.T) {
 				t.Errorf("Unexpected error: %s", err)
 			}
 
+			if request.response.status.code != tc.statusCode {
+				t.Fatalf("Expected statusCode : %d, but got %d", tc.statusCode, request.response.status.code)
+			}
+
+			if !slices.Contains(SafeMethods, tc.requestParams.method) {
+
+				if request.response.status.code > 399 {
+					t.Errorf("Failed %s request: %s", tc.requestParams.method, string(request.response.body))
+				}
+				return
+
+			}
+
 			if !headerIsSubset(request.response.headers.parsedHeaders, tc.headers) {
 				t.Errorf("Headers do not match %v not %v", tc.headers, request.response.headers.parsedHeaders)
 			}
 
-			if request.response.status.code != tc.statusCode {
-				t.Fatalf("Expected statusCode : %d, but got %d", request.response.status.code, tc.statusCode)
-			}
-
-			body := []byte(tc.body)
+			body := []byte(tc.requestParams.body)
 
 			if slices.Contains(tc.headers["Content-Type"], "application/json") {
-				body, err = jsonify(tc.body)
+				body, err = jsonify(tc.requestParams.body)
 			}
 
 			if !bytes.Equal(bytes.TrimSpace(body), bytes.TrimSpace(request.response.body)) {

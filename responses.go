@@ -35,7 +35,6 @@ func NewResponse(httpResponse *http.Response) (response response, err error) {
 		parsedHeaders: httpResponse.Header,
 		rawHeaders:    "",
 	}
-
 	response.headers = headers
 	return response, nil
 }

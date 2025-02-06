@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -14,11 +17,9 @@ type RequestData struct {
 	method string
 }
 
-func mockServer(data RequestData, status int, headers map[string][]string) (*httptest.Server, error) {
+func mockServer(data RequestData, headers map[string][]string) (*httptest.Server, error) {
 
 	f := func(w http.ResponseWriter, r *http.Request) {
-
-		w.WriteHeader(status)
 
 		if slices.Contains(SafeMethods, data.method) {
 
@@ -30,8 +31,18 @@ func mockServer(data RequestData, status int, headers map[string][]string) (*htt
 			if data.body != "" {
 				json.NewEncoder(w).Encode(data.body)
 			}
-		} // else block that check request props against the provided vars and returns a 400 and writes error to response Writer
+		} else {
+			b, err := io.ReadAll(r.Body)
 
+			if err != nil {
+				w.WriteHeader(http.StatusBadRequest)
+				w.Write([]byte(err.Error()))
+			}
+
+			if !bytes.Equal([]byte(data.body), b) || data.method != r.Method || !headerIsSubset(r.Header, headers) {
+				w.WriteHeader(http.StatusBadRequest)
+			}
+		}
 	}
 
 	return httptest.NewServer(http.HandlerFunc(f)), nil
@@ -55,6 +66,7 @@ func headerIsSubset(responseHeaders, testHeaders map[string][]string) bool {
 
 	for k, v := range testHeaders {
 		if val, ok := responseHeaders[k]; !ok || !reflect.DeepEqual(val, v) {
+			fmt.Println(k, v, val)
 			return false
 		}
 	}
