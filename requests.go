@@ -11,6 +11,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	// "github.com/SarkiMudboy/shuttle/database"
 )
 
 type Headers struct {
@@ -39,18 +40,21 @@ func (h *Headers) String() (headers string) {
 	return
 }
 
-func NewRequest() *request {
+func NewRequest(withFlags bool) *request {
 
 	command := &Command{
 		flagset: flag.NewFlagSet("call", flag.ContinueOnError),
 	}
 	request := &request{Command: command}
 
-	// flags
-	command.flagset.StringVar(&request.location, "loc", DummyEndpointTest, "Define request's URL")
-	command.flagset.StringVar(&request.method, "method", "GET", "Define request's HTTP Method")
-	command.flagset.StringVar(&request.body, "data", "", "Define the raw data for the request's body")
-	command.flagset.StringVar(&request.headers.rawHeaders, "headers", "", "Add headers for the request")
+	if withFlags {
+
+		// flags
+		command.flagset.StringVar(&request.location, "loc", "", "Define request's URL")
+		command.flagset.StringVar(&request.method, "method", "GET", "Define request's HTTP Method")
+		command.flagset.StringVar(&request.body, "data", "", "Define the raw data for the request's body")
+		command.flagset.StringVar(&request.headers.rawHeaders, "headers", "", "Add headers for the request")
+	}
 
 	request.headers.parsedHeaders = make(map[string][]string)
 
@@ -166,6 +170,15 @@ func (r *request) parseBody() (io.Reader, error) {
 }
 
 func (r *request) Run() error {
+	// if the subcommand is called without any endpoint flag: the last called request is retrieved and run,
+	// if no requests: the default dummy endpoint is used. This ensures no failure when -call is called without flags
+
+	if r.location == "" {
+		err := getLastRequest(r)
+		if err != nil {
+			r.location = DummyEndpointTest
+		}
+	}
 	return r.makeRequest(false)
 }
 
@@ -237,5 +250,7 @@ func (r *request) makeRequest(supress bool) error {
 	if !supress {
 		fmt.Println(res.String())
 	}
+
+	SaveRequestToHistory(r)
 	return nil
 }

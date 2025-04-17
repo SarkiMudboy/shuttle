@@ -13,7 +13,7 @@ func root(args []string) error {
 	}
 
 	command := args[0]
-	request := NewRequest()
+	request := NewRequest(true)
 
 	subcommands := []runner{
 		request,
